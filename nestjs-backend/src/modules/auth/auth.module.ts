@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -7,6 +7,10 @@ import {
   RefreshTokenSchema,
 } from '../user/entities/refresh-token.entity';
 import { JwtModule } from '@nestjs/jwt';
+import { User, UserSchema } from '../user/entities/user.entity';
+import { JwtStrategy } from './strategies/jwt.strategy';
+import { PassportModule } from '@nestjs/passport';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
@@ -14,6 +18,7 @@ import { JwtModule } from '@nestjs/jwt';
     MongooseModule.forFeature([
       { name: RefreshToken.name, schema: RefreshTokenSchema },
     ]),
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -26,9 +31,11 @@ import { JwtModule } from '@nestjs/jwt';
         },
       }),
     }),
+    PassportModule,
+    forwardRef(() => UserModule),
   ],
   controllers: [],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

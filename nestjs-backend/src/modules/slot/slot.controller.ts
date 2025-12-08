@@ -3,7 +3,7 @@ import { SlotService } from './slot.service';
 import { CreateSlotDto } from './dto/create-slot.dto';
 import { UpdateSlotDto } from './dto/update-slot.dto';
 
-@Controller('slot')
+@Controller('slots')
 export class SlotController {
   constructor(private readonly slotService: SlotService) {}
 

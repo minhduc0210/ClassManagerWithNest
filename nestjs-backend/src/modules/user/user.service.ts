@@ -1,29 +1,32 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterDto } from './dto/register.dto';
 import { User, UserDocument } from './entities/user.entity';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from '../auth/auth.service';
+import { ChangeInformationDto } from './dto/change-information.dto';
+import {
+  Classroom,
+  ClassroomDocument,
+} from '../classroom/entities/classroom.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Classroom.name)
+    private readonly classroomModel: Model<ClassroomDocument>,
     private authService: AuthService,
   ) {}
-
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
-  }
 
   findAll() {
     return `This action returns all user`;
@@ -31,10 +34,6 @@ export class UserService {
 
   findOne(id: number) {
     return `This action returns a #${id} user`;
-  }
-
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
   }
 
   remove(id: number) {
@@ -95,5 +94,104 @@ export class UserService {
 
   async logout(userID: string): Promise<void> {
     await this.authService.deleteRefreshToken(userID);
+  }
+
+  async changeInformation(
+    userID: string,
+    changeInfoDto: ChangeInformationDto,
+  ): Promise<Partial<User>> {
+    const { name, lastname } = changeInfoDto;
+    const user = await this.userModel
+      .findByIdAndUpdate(userID, { name, lastname }, { new: true })
+      .select('-password');
+    if (!user) throw new ConflictException('Not found this user.');
+    return user;
+  }
+
+  async getUserInformation(userId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+
+    const user = await this.userModel
+      .findById(userObjectId)
+      .select('-password -__v')
+      .exec();
+
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại.');
+    }
+
+    // 2. Lớp học đã tham gia (students: user.id)
+    const attended = await this.classroomModel
+      .find({
+        students: userObjectId,
+      })
+      .select('title subtitle teacher')
+      .populate({
+        path: 'teacher',
+        select: 'name lastname',
+      })
+      .exec();
+
+    // 3. Lớp học đã tạo (teacher: user.id)
+    const createdBy = await this.classroomModel
+      .find({
+        teacher: userObjectId,
+      })
+      .select('title subtitle teacher')
+      .populate({
+        path: 'teacher',
+        select: 'name lastname',
+      })
+      .exec();
+
+    const classrooms = [...createdBy, ...attended];
+
+    const userObject = user.toObject();
+    const userDataWithoutPass = {
+      name: userObject.name,
+      lastname: userObject.lastname,
+      email: userObject.email,
+      role: userObject.role,
+    };
+
+    return { user: userDataWithoutPass, classrooms };
+  }
+
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userModel.findById(userId).exec();
+
+    if (!user) {
+      // Tương đương với return res.status(404).json({ message: "User not found" });
+      throw new NotFoundException('Người dùng không tồn tại.');
+    }
+
+    // 2. So sánh mật khẩu cũ
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isMatch) {
+      throw new BadRequestException({
+        message: 'Mật khẩu cũ không đúng.',
+        errors: [{ path: 'oldPassword', msg: 'Old password is incorrect' }],
+      });
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      user.password = hashedPassword;
+      await user.save();
+    } catch (error) {
+      console.error('Lỗi khi hash hoặc lưu mật khẩu:', error);
+      throw new InternalServerErrorException(
+        'Không thể cập nhật mật khẩu do lỗi server.',
+      );
+    }
   }
 }

@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
-import { User } from './user.entity';
 
 export type RefreshTokenDocument = HydratedDocument<RefreshToken>;
 

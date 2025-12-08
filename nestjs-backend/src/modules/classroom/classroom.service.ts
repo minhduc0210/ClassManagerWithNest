@@ -4,7 +4,6 @@ import { UpdateClassroomDto } from './dto/update-classroom.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Classroom } from './entities/classroom.entity';
 import { Model } from 'mongoose';
-import { nanoid } from 'nanoid';
 
 @Injectable()
 export class ClassroomService {
@@ -13,6 +12,7 @@ export class ClassroomService {
   ) {}
 
   async create(createClassroomDto: CreateClassroomDto): Promise<Classroom> {
+    const { nanoid } = await import('nanoid');
     const createdClassroom = new this.classModel(createClassroomDto);
     createdClassroom.accessCode = nanoid(5).toUpperCase().trim();
     const existingClassroom = await this.classModel

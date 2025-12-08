@@ -33,18 +33,18 @@ export class Classroom {
     type: [{ type: mongoose.Types.ObjectId, ref: 'User' }],
     default: [],
   })
-  students: User[];
+  students: [mongoose.Types.ObjectId];
 
   @Prop({
     type: [{ type: mongoose.Types.ObjectId, ref: 'Slot' }],
     default: [],
   })
-  slots: Slot[];
+  slots: [mongoose.Types.ObjectId];
 
   @Prop({
     type: { type: mongoose.Types.ObjectId, ref: 'Slot' },
   })
-  teacher: User;
+  teacher: mongoose.Types.ObjectId;
 }
 
 export const ClassroomSchema = SchemaFactory.createForClass(Classroom);
