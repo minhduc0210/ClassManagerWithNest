@@ -1,10 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
   Get,
   Post,
   Body,
   Param,
-  Delete,
   HttpStatus,
   Res,
   Req,
@@ -22,6 +22,7 @@ import { AuthService } from '../auth/auth.service';
 import { ChangeInformationDto } from './dto/change-information.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { VerifyPasswordDto } from './dto/verify-password.dto';
 
 interface AuthenticatedRequest extends Request {
   user: { userId: string; email: string; role: string };
@@ -139,11 +140,6 @@ export class UserController {
     }
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
-  }
-
   @Put(':userID')
   async update(
     @Param('userID') userID: string,
@@ -165,7 +161,9 @@ export class UserController {
           .json({ message: 'Not found user!' });
       return res.status(HttpStatus.OK).json(user);
     } catch (error) {
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(error);
+      return res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .json({ message: error || 'Internal server error' });
     }
   }
 
@@ -193,12 +191,41 @@ export class UserController {
         throw error;
       }
 
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(error);
+      return res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .json({ message: error || 'Internal server error' });
     }
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+  @Post('reset-password')
+  @UseGuards(JwtAuthGuard)
+  async resetPassword(
+    @Req() req: AuthenticatedRequest,
+    @Res() res: express.Response,
+  ) {
+    const email = req.user.email;
+    const tempPassword = await this.userService.resetPassword(email);
+    return res.status(HttpStatus.OK).json({
+      tempPassword,
+      message: 'A temporary password has been sent to your email.',
+    });
+  }
+
+  @Post('verify-password')
+  @UseGuards(JwtAuthGuard)
+  async verifyPassword(
+    @Body() body: VerifyPasswordDto,
+    @Req() req: AuthenticatedRequest,
+    @Res() res: express.Response,
+  ) {
+    const email = req.user.email;
+    await this.userService.verifyPassword(
+      email,
+      body.tempPassword,
+      body.newPassword,
+    );
+    return res.status(HttpStatus.OK).json({
+      message: 'Password updated successfully!',
+    });
   }
 }

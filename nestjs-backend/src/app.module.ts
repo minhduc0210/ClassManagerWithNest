@@ -8,6 +8,7 @@ import { ClassroomModule } from './modules/classroom/classroom.module';
 import { PostModule } from './modules/post/post.module';
 import { SlotModule } from './modules/slot/slot.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AuthModule } from './modules/auth/auth.module';
     PostModule,
     SlotModule,
     AuthModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

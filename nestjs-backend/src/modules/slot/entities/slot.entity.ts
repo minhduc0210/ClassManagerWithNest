@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { Post } from 'src/modules/post/entities/post.entity';
 
 export type SlotDocument = HydratedDocument<Slot>;
 
@@ -30,7 +29,7 @@ export class Slot {
     type: [{ type: mongoose.Types.ObjectId, ref: 'Post' }],
     default: [],
   })
-  post: Post[];
+  posts: [mongoose.Types.ObjectId];
 }
 
 export const SlotSchema = SchemaFactory.createForClass(Slot);

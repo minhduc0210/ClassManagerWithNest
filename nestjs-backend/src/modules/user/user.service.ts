@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   BadRequestException,
   ConflictException,
@@ -18,6 +21,7 @@ import {
   Classroom,
   ClassroomDocument,
 } from '../classroom/entities/classroom.entity';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class UserService {
@@ -26,6 +30,7 @@ export class UserService {
     @InjectModel(Classroom.name)
     private readonly classroomModel: Model<ClassroomDocument>,
     private authService: AuthService,
+    private readonly mailService: MailService,
   ) {}
 
   findAll() {
@@ -52,12 +57,9 @@ export class UserService {
     if (user) {
       throw new ConflictException('Email has been registered!');
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await this.userModel.create({
       ...registerData,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       password: hashedPassword,
     });
     const newUserWithoutPass = {
@@ -73,7 +75,6 @@ export class UserService {
     const { email, password } = loginData;
     const user = await this.userModel.findOne({ email });
     if (!user) throw new NotFoundException('Email not found!');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException();
     const accessToken = this.authService.createAccessToken(user);
@@ -165,12 +166,8 @@ export class UserService {
     const user = await this.userModel.findById(userId).exec();
 
     if (!user) {
-      // Tương đương với return res.status(404).json({ message: "User not found" });
       throw new NotFoundException('Người dùng không tồn tại.');
     }
-
-    // 2. So sánh mật khẩu cũ
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const isMatch = await bcrypt.compare(oldPassword, user.password);
 
     if (!isMatch) {
@@ -181,10 +178,7 @@ export class UserService {
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       user.password = hashedPassword;
       await user.save();
     } catch (error) {
@@ -193,5 +187,37 @@ export class UserService {
         'Không thể cập nhật mật khẩu do lỗi server.',
       );
     }
+  }
+
+  async resetPassword(email: string): Promise<string> {
+    try {
+      const user = await this.userModel.findOne({ email });
+      if (!user) {
+        throw new NotFoundException('Not found user with this email!');
+      }
+      const tempPassword = Math.random().toString(36).slice(-6);
+      user.tempPassword = tempPassword;
+      await user.save();
+      await this.mailService.sendResetPasswordEmail(email, tempPassword);
+      return tempPassword;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  async verifyPassword(
+    email: string,
+    tempPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userModel.findOne({ email });
+    if (!user) {
+      throw new NotFoundException('Not found user with this email!');
+    }
+    if (tempPassword !== user.tempPassword) {
+      throw new UnauthorizedException('Invalid passowrd!');
+    }
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
   }
 }

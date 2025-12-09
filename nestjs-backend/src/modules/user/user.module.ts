@@ -8,6 +8,7 @@ import {
   Classroom,
   ClassroomSchema,
 } from '../classroom/entities/classroom.entity';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import {
       { name: Classroom.name, schema: ClassroomSchema },
     ]),
     forwardRef(() => AuthModule),
+    MailModule,
   ],
   controllers: [UserController],
   providers: [UserService],

@@ -1,7 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { Slot } from 'src/modules/slot/entities/slot.entity';
-import { User } from 'src/modules/user/entities/user.entity';
 
 export type ClassroomDocument = HydratedDocument<Classroom>;
 
@@ -42,13 +40,10 @@ export class Classroom {
   slots: [mongoose.Types.ObjectId];
 
   @Prop({
-    type: { type: mongoose.Types.ObjectId, ref: 'Slot' },
+    type: mongoose.Types.ObjectId,
+    ref: 'User',
   })
   teacher: mongoose.Types.ObjectId;
 }
 
 export const ClassroomSchema = SchemaFactory.createForClass(Classroom);
-
-
-
-
