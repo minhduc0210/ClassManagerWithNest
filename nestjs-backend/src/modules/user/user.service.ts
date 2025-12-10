@@ -220,4 +220,13 @@ export class UserService {
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
   }
+
+  // Thêm hàm này:
+  async getUserName(userId: string): Promise<string> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new Error('User not found.');
+    }
+    return `${user.name} ${user.lastname}`;
+  }
 }

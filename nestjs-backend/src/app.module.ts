@@ -9,6 +9,7 @@ import { PostModule } from './modules/post/post.module';
 import { SlotModule } from './modules/slot/slot.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { MailModule } from './modules/mail/mail.module';
+import { FileUploadModule } from './modules/file-upload/file-upload.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { MailModule } from './modules/mail/mail.module';
     SlotModule,
     AuthModule,
     MailModule,
+    FileUploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

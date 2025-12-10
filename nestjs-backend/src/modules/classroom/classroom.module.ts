@@ -16,5 +16,6 @@ import { Post, PostSchema } from '../post/entities/post.entity';
   ],
   controllers: [ClassroomController],
   providers: [ClassroomService],
+  exports: [ClassroomService],
 })
 export class ClassroomModule {}

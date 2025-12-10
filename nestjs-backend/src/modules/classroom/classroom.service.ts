@@ -195,4 +195,21 @@ export class ClassroomService {
       );
     }
   }
+
+  async getClassroomAndSlotNames(
+    classroomId: string,
+    slotId: string,
+  ): Promise<{ classroomName: string; slotTitle: string }> {
+    const classroom = await this.classModel.findById(classroomId);
+    const slot = await this.slotModel.findById(slotId).exec();
+
+    if (!classroom || !slot) {
+      throw new Error('Classroom or Slot not found.');
+    }
+
+    return {
+      classroomName: classroom.title,
+      slotTitle: slot.title,
+    };
+  }
 }

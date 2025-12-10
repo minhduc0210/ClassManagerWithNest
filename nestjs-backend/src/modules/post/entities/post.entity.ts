@@ -27,7 +27,8 @@ export class Post {
   file: string;
 
   @Prop({
-    type: { type: mongoose.Types.ObjectId, ref: 'User' },
+    type: mongoose.Types.ObjectId,
+    ref: 'User',
   })
   author: mongoose.Types.ObjectId;
 }
