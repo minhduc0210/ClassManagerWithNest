@@ -25,6 +25,8 @@ const Post = () => {
     useEffect(() => {
         const getPostsBySlot = async () => {
             let { data } = await fetchPostsBySlot(classroomID, slotID);
+            console.log(data);
+            
             setPosts([...data.posts.posts]);
         };
         getPostsBySlot();

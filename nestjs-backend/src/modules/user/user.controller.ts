@@ -13,6 +13,7 @@ import {
   NotFoundException,
   UseGuards,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto } from './dto/register.dto';
@@ -47,6 +48,28 @@ export class UserController {
         user: newUser,
       });
     } catch (error) {
+      if (error instanceof ConflictException) {
+        return res.status(HttpStatus.BAD_REQUEST).json({
+          errors: [
+            {
+              path: 'email',
+              msg: error.message,
+            },
+          ],
+        });
+      }
+
+      if (error instanceof BadRequestException) {
+        const responseBody = error.getResponse();
+        const messages = (responseBody as { message: string[] }).message;
+
+        const errors = Array.isArray(messages)
+          ? messages.map((msg) => ({ path: 'validation', msg }))
+          : [{ path: 'validation', msg: error.message }];
+
+        return res.status(HttpStatus.BAD_REQUEST).json({ errors });
+      }
+
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         message: error || 'Internal server error',
@@ -59,12 +82,31 @@ export class UserController {
     try {
       const userData = await this.userService.login(loginDTO);
       return res.status(HttpStatus.OK).json({
-        userData,
+        id: userData.id,
+        name: userData.name,
+        lastname: userData.lastname,
+        email: userData.email,
+        role: userData.role,
+        accessToken: userData.accessToken,
+        refreshToken: userData.refreshToken,
       });
     } catch (error) {
+      // 3. Xử lý lỗi Unauthorized (401)
+      if (error instanceof UnauthorizedException) {
+        // Lấy thông báo lỗi (đã được đặt là 'Incorrect email or password')
+        const errorMessage =
+          (error.getResponse() as any).message || 'Lỗi xác thực.';
+
+        // Trả về HTTP 401 và định dạng lỗi theo Express cũ
+        return res.status(HttpStatus.UNAUTHORIZED).json({
+          errors: [{ msg: errorMessage }],
+        });
+      }
+
+      // 4. Xử lý lỗi Server (500)
+      console.error(error);
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        message: error || 'Internal server error',
+        message: 'Internal Server Error',
       });
     }
   }

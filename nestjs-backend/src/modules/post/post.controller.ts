@@ -63,8 +63,10 @@ export class PostController {
   async getPostsBySlot(
     @Param('classroomID') classroomID: string,
     @Param('slotID') slotID: string,
+    @Res() res: express.Response,
   ) {
-    return this.postService.getPostsBySlot(classroomID, slotID);
+    const posts = await this.postService.getPostsBySlot(classroomID, slotID);
+    return res.status(200).json({ posts });
   }
 
   @Get(':id')

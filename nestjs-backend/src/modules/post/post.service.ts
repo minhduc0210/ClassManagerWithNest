@@ -223,10 +223,7 @@ export class PostService {
     }
   }
 
-  async getPostsBySlot(
-    classroomID: string,
-    slotID: string,
-  ): Promise<PostDocument[]> {
+  async getPostsBySlot(classroomID: string, slotID: string) {
     // 1. Kiểm tra ID
     if (
       !Types.ObjectId.isValid(classroomID) ||
@@ -254,7 +251,7 @@ export class PostService {
       }
 
       // 3. Truy xuất Slot và Populate Posts & Author (Nested Populate)
-      const slot = await this.slotModel
+      const posts = await this.slotModel
         .findById(slotMongooseID)
         .populate({
           path: 'posts', // Populate mảng Post IDs
@@ -266,13 +263,7 @@ export class PostService {
         })
         .exec();
 
-      // Trường hợp Slot không có Post (mặc dù đã được kiểm tra ở bước 2)
-      if (!slot) {
-        throw new NotFoundException('Không tìm thấy Slot.');
-      }
-
-      // Trả về mảng posts đã được populate
-      return slot.posts as unknown as PostDocument[];
+      return posts;
     } catch (error) {
       if (
         error instanceof NotFoundException ||
