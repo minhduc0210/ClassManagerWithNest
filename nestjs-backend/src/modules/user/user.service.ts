@@ -149,6 +149,7 @@ export class UserService {
 
     const userObject = user.toObject();
     const userDataWithoutPass = {
+      _id: userObject._id,
       name: userObject.name,
       lastname: userObject.lastname,
       email: userObject.email,

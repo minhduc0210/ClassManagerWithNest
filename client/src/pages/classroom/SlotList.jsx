@@ -25,6 +25,8 @@ const SlotList = ({ slots, classroom, setClassroom }) => {
         e.preventDefault();
         try {
             const { data } = await fetchUpdateSlot(editingSlot._id, editingSlot);
+            console.log(data);
+            
             if (data.status === 200) {
                 setClassroom((prev) => ({
                     ...prev,

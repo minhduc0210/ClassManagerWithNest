@@ -11,6 +11,7 @@ import { AiFillDelete, AiFillEdit } from "react-icons/ai";
 import { postValidation } from "../../validations";
 import { useLocation, useParams } from "react-router-dom";
 import { fetchClassroomDetail } from "../../services/ClassroomService.js";
+import { toast } from "react-toastify";
 
 const Post = () => {
     const location = useLocation();
@@ -26,7 +27,7 @@ const Post = () => {
         const getPostsBySlot = async () => {
             let { data } = await fetchPostsBySlot(classroomID, slotID);
             console.log(data);
-            
+
             setPosts([...data.posts.posts]);
         };
         getPostsBySlot();
@@ -47,9 +48,13 @@ const Post = () => {
     };
 
     const deletePost = async (slotID, postID) => {
-        await fetchDeletePost(slotID, postID);
-        setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postID));
-        setShowPopover(false);
+        const response = await fetchDeletePost(slotID, postID);
+        if (response.data.success) {
+            toast.success("Delete post successfully!");
+            setPosts((prevPosts) => prevPosts.filter((post) => post._id !== postID));
+            setShowPopover(false);
+        }
+
     };
 
     const handleShowModal = (post = null) => {
@@ -190,17 +195,58 @@ const PostModal = ({ show, handleClose, classroomID, slotID, post, setPosts }) =
         },
         validationSchema: postValidation,
         onSubmit: async (values) => {
-            formData.append("title", values.title);
-            formData.append("content", values.content);
-            formData.append("post_file", values.post_file)
-            if (post) {
-                await fetchUpdatePost(classroomID, slotID, post._id, formData);
-            } else {
-                await fetchCreatePost(classroomID, slotID, formData);
+            try {
+                let response;
+                const isFileUpload = values.post_file instanceof File;
+
+                if (isFileUpload) {
+                    // TRƯỜNG HỢP 1: CÓ FILE - Gửi FormData
+                    const submitData = new FormData();
+                    submitData.append("title", values.title);
+                    submitData.append("content", values.content);
+                    // Quan trọng: Key 'file' phải khớp với @FileInterceptor('file') ở Backend
+                    submitData.append("file", values.post_file);
+
+                    if (post) {
+                        response = await fetchUpdatePost(classroomID, slotID, post._id, submitData);
+                    } else {
+                        response = await fetchCreatePost(classroomID, slotID, submitData);
+                    }
+                } else {
+                    // TRƯỜNG HỢP 2: KHÔNG FILE - Gửi JSON Object thuần túy
+                    const jsonData = {
+                        title: values.title,
+                        content: values.content,
+                    };
+
+                    if (post) {
+                        response = await fetchUpdatePost(classroomID, slotID, post._id, jsonData);
+                    } else {
+                        response = await fetchCreatePost(classroomID, slotID, jsonData);
+                    }
+                }
+
+                // Kiểm tra response dựa trên cấu trúc backend của bạn
+                if (response.status === 200 || response.status === 201 || response.data?.success) {
+                    toast.success(post ? "Post updated successfully!" : "Post created successfully!");
+                }
+
+                // Load lại danh sách post
+                const { data } = await fetchPostsBySlot(classroomID, slotID);
+                // Lưu ý: Kiểm tra lại đường dẫn data.posts.posts của bạn
+                if (data?.posts?.posts) {
+                    setPosts([...data.posts.posts]);
+                }
+
+                handleClose();
+
+            } catch (error) {
+                console.error("Submit error:", error);
+                const errorMsg = error.response?.data?.errors?.[0]?.msg ||
+                    error.response?.data?.message ||
+                    error.message;
+                toast.error("Error: " + errorMsg);
             }
-            let { data } = await fetchPostsBySlot(classroomID, slotID);
-            setPosts([...data.posts.posts]);
-            handleClose();
         },
     });
 

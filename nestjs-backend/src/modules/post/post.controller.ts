@@ -74,9 +74,21 @@ export class PostController {
     return this.postService.findOne(+id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto) {
-    return this.postService.update(+id, updatePostDto);
+  @Patch('/:classroomID/:slotID/:postID')
+  async update(
+    @Param('classroomID') classroomID: string,
+    @Param('slotID') slotID: string,
+    @Param('postID') postID: string,
+    @Body() updatePostDto: UpdatePostDto,
+    @Res() res: express.Response,
+  ) {
+    const response = await this.postService.updatePost(
+      classroomID,
+      slotID,
+      postID,
+      updatePostDto,
+    );
+    return res.status(HttpStatus.OK).json({ success: true, data: response });
   }
 
   @Delete(':slotID/:postID')

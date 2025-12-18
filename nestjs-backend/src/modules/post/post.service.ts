@@ -82,6 +82,50 @@ export class PostService {
     return newPost;
   }
 
+  async updatePost(
+    classroomID: string,
+    slotID: string,
+    postID: string,
+    updateDTO: UpdatePostDto,
+  ): Promise<PostDocument> {
+    console.log(updateDTO);
+    if (
+      !Types.ObjectId.isValid(classroomID) ||
+      !Types.ObjectId.isValid(slotID) ||
+      !Types.ObjectId.isValid(postID)
+    ) {
+      throw new BadRequestException('ID truyền không hợp lệ.');
+    }
+
+    const classroomMongooseID = new Types.ObjectId(classroomID);
+    const slotMongooseID = new Types.ObjectId(slotID);
+    const postMongooseID = new Types.ObjectId(postID);
+    const classroom = await this.classModel
+      .findById(classroomMongooseID)
+      .select('slots')
+      .exec();
+    if (!classroom) {
+      throw new NotFoundException('Không tìm thấy lớp học này.');
+    }
+    const slot = await this.slotModel.findById(slotMongooseID);
+    if (!slot) {
+      throw new NotFoundException('Không tìm thấy slot này.');
+    }
+    if (!classroom.slots.includes(slotMongooseID)) {
+      throw new NotFoundException('Not found this slot in classroom');
+    }
+    if (!slot.posts.includes(postMongooseID)) {
+      throw new NotFoundException('Not found this post in slot');
+    }
+    const updatedPost = await this.postModel.findByIdAndUpdate(
+      postMongooseID,
+      { $set: updateDTO },
+      { new: true, runValidators: true },
+    );
+    if (!updatedPost) throw new NotFoundException('Not found this post');
+    return updatedPost;
+  }
+
   async deletePost(
     userID: string,
     slotID: string,
@@ -284,9 +328,5 @@ export class PostService {
 
   findOne(id: number) {
     return `This action returns a #${id} post`;
-  }
-
-  update(id: number, updatePostDto: UpdatePostDto) {
-    return `This action updates a #${id} ${updatePostDto.title} post`;
   }
 }

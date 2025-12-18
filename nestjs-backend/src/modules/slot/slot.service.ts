@@ -31,6 +31,10 @@ export class SlotService {
     const classroomMongooseID = new Types.ObjectId(classroomID);
     const { title, content, startTime, endTime } = createSlotDto;
 
+    if (startTime > endTime) {
+      throw new BadRequestException('Start time must before end time!');
+    }
+
     const classroom = await this.classroomModel.findById(classroomMongooseID);
     if (!classroom) {
       throw new NotFoundException(
@@ -77,13 +81,50 @@ export class SlotService {
   }
 
   async update(id: string, updateSlotDto: UpdateSlotDto): Promise<Slot> {
-    const slot = await this.slotModel
-      .findByIdAndUpdate(id, updateSlotDto, { new: true })
-      .exec();
-    if (!slot) {
-      throw new NotFoundException(`Slot with ID "${id}" not found`);
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('ID không hợp lệ.');
     }
-    return slot;
+
+    const existingSlot = await this.slotModel.findById(id).exec();
+    if (!existingSlot) {
+      throw new NotFoundException(`Slot với ID "${id}" không tồn tại`);
+    }
+
+    const updatedStartTime = updateSlotDto.startTime
+      ? new Date(updateSlotDto.startTime)
+      : existingSlot.startTime;
+    const updatedEndTime = updateSlotDto.endTime
+      ? new Date(updateSlotDto.endTime)
+      : existingSlot.endTime;
+
+    if (updatedStartTime > updatedEndTime) {
+      throw new BadRequestException('Start time must be before end time!');
+    }
+
+    const prevSlot = await this.slotModel
+      .findOne({ _id: { $ne: id }, startTime: { $lt: existingSlot.startTime } })
+      .sort({ startTime: -1 })
+      .exec();
+
+    const nextSlot = await this.slotModel
+      .findOne({ _id: { $ne: id }, startTime: { $gt: existingSlot.startTime } })
+      .sort({ startTime: 1 })
+      .exec();
+
+    if (prevSlot && updatedStartTime < new Date(prevSlot.endTime)) {
+      throw new BadRequestException(
+        `Cập nhật thất bại. Thời gian bắt đầu xung đột với Slot trước đó (kết thúc lúc ${prevSlot.endTime.toISOString()}).`,
+      );
+    }
+
+    if (nextSlot && updatedEndTime > new Date(nextSlot.startTime)) {
+      throw new BadRequestException(
+        `Cập nhật thất bại. Thời gian kết thúc xung đột với Slot sau đó (bắt đầu lúc ${nextSlot.startTime.toISOString()}).`,
+      );
+    }
+
+    Object.assign(existingSlot, updateSlotDto);
+    return await existingSlot.save();
   }
 
   remove(id: number) {
