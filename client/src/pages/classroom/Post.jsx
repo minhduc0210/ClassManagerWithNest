@@ -43,8 +43,19 @@ const Post = () => {
         getClassroomDetail(classroomID);
     }, [setPosts]);
 
-    const downloadFile = async (filename) => {
-        saveAs(fetchDownloadPostFile(filename), `${filename}`);
+    const downloadFile = async (fileUrl) => {
+        try {
+            const blob = await fetchDownloadPostFile(fileUrl);
+
+            // Lấy tên file gốc từ đường dẫn (ví dụ: "uploads/abc/test.pdf" -> "test.pdf")
+            const fileName = fileUrl.split('/').pop();
+
+            // saveAs sẽ xử lý Blob và kích hoạt trình duyệt tải về
+            saveAs(blob, fileName);
+        } catch (error) {
+            console.error("Download error:", error);
+            toast.error("Could not download the file.");
+        }
     };
 
     const deletePost = async (slotID, postID) => {
@@ -198,6 +209,7 @@ const PostModal = ({ show, handleClose, classroomID, slotID, post, setPosts }) =
             try {
                 let response;
                 const isFileUpload = values.post_file instanceof File;
+                console.log(values.post_file);
 
                 if (isFileUpload) {
                     // TRƯỜNG HỢP 1: CÓ FILE - Gửi FormData

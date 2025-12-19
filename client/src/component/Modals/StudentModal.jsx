@@ -10,12 +10,17 @@ const StudentModal = (props) => {
         },
         onSubmit: async (values, bag) => {
             try {
-                const result = await fetchJoinClassroom(values.classroomCode);
-                if (result.status === 200) {
-                    props.onHide();
-                    values.classroomCode = "";
-                    toast.success(`Join class successfully`);
+                if (values.classroomCode.length === 0) {
+                    toast.error("You must enter the classroom code!");
+                } else {
+                    const result = await fetchJoinClassroom(values.classroomCode);
+                    if (result.status === 200) {
+                        props.onHide();
+                        values.classroomCode = "";
+                        toast.success(`Join class successfully`);
+                    }
                 }
+
             } catch (err) {
                 console.log(err)
                 if (err.response && err.response.data.errors) {
@@ -58,6 +63,7 @@ const StudentModal = (props) => {
                             onBlur={formik.onBlur}
                             value={formik.values.classroomCode.toUpperCase()}
                             name="classroomCode"
+                            required
                             type="text"
                             isInvalid={
                                 formik.touched.classroomCode && formik.errors.classroomCode
