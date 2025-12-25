@@ -10,4 +10,8 @@ export class UpdatePostDto {
   @IsString({ message: 'Content must be a string.' })
   @MinLength(1, { message: 'Content must have at least 1 characters.' })
   content?: string;
+
+  @IsOptional()
+  @IsString({ message: 'File must be a string.' })
+  file?: string;
 }

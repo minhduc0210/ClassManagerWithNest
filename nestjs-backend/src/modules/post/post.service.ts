@@ -16,7 +16,7 @@ import {
   ClassroomDocument,
 } from '../classroom/entities/classroom.entity';
 import { Slot, SlotDocument } from '../slot/entities/slot.entity';
-import { FileUploadService } from '../file-upload/file-upload.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class PostService {
@@ -26,8 +26,9 @@ export class PostService {
     private classModel: Model<ClassroomDocument>,
     @InjectModel(Slot.name)
     private slotModel: Model<SlotDocument>,
-    private readonly fileUploadService: FileUploadService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
+
   async create(
     userID: string,
     classroomID: string,
@@ -48,7 +49,7 @@ export class PostService {
     const userMongooseID = new Types.ObjectId(userID);
     const classroom = await this.classModel
       .findById(classroomMongooseID)
-      .select('slots')
+      .select('slots title')
       .exec();
     if (!classroom) {
       throw new NotFoundException('Không tìm thấy lớp học này.');
@@ -60,16 +61,12 @@ export class PostService {
     if (!classroom.slots.includes(slotMongooseID)) {
       throw new NotFoundException('Not found this slot in classroom');
     }
-    let fileUrl: string | undefined;
 
+    let fileUrl: string | undefined;
     if (file) {
-      // 1. GỌI DỊCH VỤ XỬ LÝ FILE ĐỘC LẬP
-      fileUrl = await this.fileUploadService.processAndGetFileUrl(
-        file,
-        userID,
-        classroomID,
-        slotID,
-      );
+      const folderPath = `class-manager/${classroom.title}/${slot.title}`;
+      const uploadResult = await this.cloudinary.uploadFile(file, folderPath);
+      fileUrl = uploadResult.secure_url;
     }
 
     const newPost = await this.postModel.create({
@@ -87,8 +84,8 @@ export class PostService {
     slotID: string,
     postID: string,
     updateDTO: UpdatePostDto,
+    file?: Express.Multer.File,
   ): Promise<PostDocument> {
-    console.log(updateDTO);
     if (
       !Types.ObjectId.isValid(classroomID) ||
       !Types.ObjectId.isValid(slotID) ||
@@ -102,11 +99,15 @@ export class PostService {
     const postMongooseID = new Types.ObjectId(postID);
     const classroom = await this.classModel
       .findById(classroomMongooseID)
-      .select('slots')
+      .select('slots title')
       .exec();
     if (!classroom) {
       throw new NotFoundException('Không tìm thấy lớp học này.');
     }
+
+    const post = await this.postModel.findById(postID);
+    if (!post) throw new NotFoundException('Không tìm thấy bài đăng.');
+
     const slot = await this.slotModel.findById(slotMongooseID);
     if (!slot) {
       throw new NotFoundException('Không tìm thấy slot này.');
@@ -117,9 +118,35 @@ export class PostService {
     if (!slot.posts.includes(postMongooseID)) {
       throw new NotFoundException('Not found this post in slot');
     }
+
+    let newFileUrl = updateDTO.file;
+    if (file) {
+      if (post.file) {
+        try {
+          const assetInfo = this.cloudinary.extractAssetInfo(post.file);
+          console.log(assetInfo);
+          
+          await this.cloudinary.deleteFile(
+            assetInfo.publicId,
+            assetInfo.resourceType,
+          );
+        } catch (error) {
+          console.error('Failed to delete old file from Cloudinary:', error);
+        }
+      }
+      const folderPath = `class-manager/${classroom.title}/${slot.title}`;
+      const uploadResult = await this.cloudinary.uploadFile(file, folderPath);
+      newFileUrl = uploadResult.secure_url;
+    }
+
     const updatedPost = await this.postModel.findByIdAndUpdate(
       postMongooseID,
-      { $set: updateDTO },
+      {
+        $set: {
+          ...updateDTO,
+          file: newFileUrl,
+        },
+      },
       { new: true, runValidators: true },
     );
     if (!updatedPost) throw new NotFoundException('Not found this post');

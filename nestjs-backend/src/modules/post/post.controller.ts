@@ -14,6 +14,7 @@ import {
   Req,
   Res,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -21,8 +22,7 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import express from 'express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import path, { join } from 'path';
 import { existsSync } from 'fs';
 
 interface AuthenticatedRequest extends Request {
@@ -35,18 +35,7 @@ export class PostController {
   constructor(private readonly postService: PostService) {}
 
   @Post(':classroomID/:slotID')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './temp_uploads',
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file'))
   async createPost(
     @UploadedFile() file: Express.Multer.File,
     @Param('classroomID') classroomID: string,
@@ -54,15 +43,6 @@ export class PostController {
     @Req() req: AuthenticatedRequest,
     @Body() createPostDto: CreatePostDto,
   ) {
-    console.log('Multer File Object:', file);
-
-    if (!file) {
-      console.log('=> Không nhận được file. Kiểm tra lại Key ở Frontend!');
-    } else if (!file.path) {
-      console.log(
-        '=> Có file nhưng không có path. Có thể do đang dùng memoryStorage thay vì diskStorage.',
-      );
-    }
     const newPost = await this.postService.create(
       req.user.userId,
       classroomID,
@@ -81,15 +61,17 @@ export class PostController {
   downloadFile(@Param('0') filePath: string, @Res() res: express.Response) {
     const fullPath = join(process.cwd(), 'public', filePath);
 
-    // Kiểm tra file có tồn tại không
     if (!existsSync(fullPath)) {
-      return res.status(HttpStatus.NOT_FOUND).send('File not found');
+      throw new NotFoundException('Tệp tin không tồn tại');
     }
-
-    // Thực hiện gửi file về client
-    return res.download(fullPath, (err) => {
+    const fileName = path.basename(fullPath);
+    return res.download(fullPath, fileName, (err) => {
       if (err) {
-        console.error('Lỗi khi tải file:', err);
+        if (!res.headersSent) {
+          res
+            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .send('Error downloading file');
+        }
       }
     });
   }
@@ -115,10 +97,12 @@ export class PostController {
   }
 
   @Patch('/:classroomID/:slotID/:postID')
+  @UseInterceptors(FileInterceptor('file'))
   async update(
     @Param('classroomID') classroomID: string,
     @Param('slotID') slotID: string,
     @Param('postID') postID: string,
+    @UploadedFile() file: Express.Multer.File,
     @Body() updatePostDto: UpdatePostDto,
     @Res() res: express.Response,
   ) {
@@ -127,6 +111,7 @@ export class PostController {
       slotID,
       postID,
       updatePostDto,
+      file,
     );
     return res.status(HttpStatus.OK).json({ success: true, data: response });
   }

@@ -8,8 +8,7 @@ import {
   ClassroomSchema,
 } from '../classroom/entities/classroom.entity';
 import { Slot, SlotSchema } from '../slot/entities/slot.entity';
-import { FileUploadModule } from '../file-upload/file-upload.module';
-
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -17,7 +16,7 @@ import { FileUploadModule } from '../file-upload/file-upload.module';
       { name: Slot.name, schema: SlotSchema },
       { name: Post.name, schema: PostSchema },
     ]),
-    FileUploadModule,
+    CloudinaryModule,
   ],
   controllers: [PostController],
   providers: [PostService],
