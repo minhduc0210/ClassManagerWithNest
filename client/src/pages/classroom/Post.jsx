@@ -17,7 +17,7 @@ import {
 import {
   fetchCreatePost,
   fetchDeletePost,
-  fetchDownloadPostFile,
+  downloadCloudinaryFile,
   fetchPostsBySlot,
   fetchUpdatePost,
 } from "../../services/PostService.js";
@@ -65,10 +65,19 @@ const Post = () => {
 
   const downloadFile = async (fileUrl) => {
     if (!fileUrl) return;
+    const downloadToast = toast.loading("Preparing your download...");
     try {
-      const blob = await fetchDownloadPostFile(fileUrl);
-      const fileName = fileUrl.split("/").pop() || "downloaded-file";
+      const blob = await downloadCloudinaryFile(fileUrl);
+      const fileName = fileUrl.split('/').pop().split('?')[0];
+
       saveAs(blob, fileName);
+
+      toast.update(downloadToast, {
+        render: "Download started!",
+        type: "success",
+        isLoading: false,
+        autoClose: 2000
+      });
     } catch (error) {
       console.error("Download error:", error);
       toast.error("Không thể tải tập tin.");

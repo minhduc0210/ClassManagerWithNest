@@ -63,7 +63,12 @@ export class SlotController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.slotService.remove(+id);
+  async remove(@Param('id') id: string, @Res() res: express.Response) {
+    const response = await this.slotService.remove(id);
+    res.status(HttpStatus.OK).json({
+      status: 200,
+      message: 'Slot deleted successfully',
+      success: response.success,
+    });
   }
 }

@@ -7,6 +7,7 @@ import {
   Classroom,
   ClassroomSchema,
 } from '../classroom/entities/classroom.entity';
+import { PostModule } from '../post/post.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import {
       { name: Slot.name, schema: SlotSchema },
       { name: Classroom.name, schema: ClassroomSchema },
     ]),
+    PostModule,
   ],
   controllers: [SlotController],
   providers: [SlotService],

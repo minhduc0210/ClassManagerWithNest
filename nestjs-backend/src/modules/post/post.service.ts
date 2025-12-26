@@ -125,7 +125,7 @@ export class PostService {
         try {
           const assetInfo = this.cloudinary.extractAssetInfo(post.file);
           console.log(assetInfo);
-          
+
           await this.cloudinary.deleteFile(
             assetInfo.publicId,
             assetInfo.resourceType,
@@ -197,6 +197,18 @@ export class PostService {
       .findByIdAndDelete(postMongooseID)
       .exec();
 
+    if (deletedPost?.file) {
+      try {
+        const assetInfo = this.cloudinary.extractAssetInfo(deletedPost.file);
+        await this.cloudinary.deleteFile(
+          assetInfo.publicId,
+          assetInfo.resourceType,
+        );
+      } catch (error) {
+        console.log('Fail to delete cloudinary file: ', error);
+      }
+    }
+
     if (!deletedPost) {
       throw new NotFoundException('Bài đăng không thể xóa hoặc đã bị xóa.');
     }
@@ -206,15 +218,55 @@ export class PostService {
       .exec();
   }
 
+  async deleteManyPosts(postIds: Types.ObjectId[]): Promise<void> {
+    if (!postIds || postIds.length === 0) return;
+    const validIds = postIds.every((id) =>
+      Types.ObjectId.isValid(id.toString()),
+    );
+    if (!validIds) {
+      throw new BadRequestException('Một hoặc nhiều ID bài đăng không hợp lệ.');
+    }
+
+    const posts = await this.postModel.find({ _id: { $in: postIds } }).exec();
+
+    if (posts.length === 0) return;
+
+    await Promise.all(
+      posts.map(async (post) => {
+        if (post.file) {
+          try {
+            const { publicId, resourceType } = this.cloudinary.extractAssetInfo(
+              post.file,
+            );
+            const result = await this.cloudinary.deleteFile(
+              publicId,
+              resourceType,
+            );
+
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            if (result?.result !== 'ok') {
+              console.warn(
+                `Cloudinary asset not found during bulk delete: ${publicId}`,
+              );
+            }
+          } catch (error) {
+            console.error(
+              `Failed to cleanup Cloudinary for post ${post.title}:`,
+              error,
+            );
+          }
+        }
+      }),
+    );
+
+    await this.postModel.deleteMany({ _id: { $in: postIds } }).exec();
+  }
+
   async getPostsByClassroom(classroomID: string): Promise<PostDocument[]> {
-    // 1. Kiểm tra ID
     if (!Types.ObjectId.isValid(classroomID)) {
       throw new BadRequestException('ID lớp học không hợp lệ.');
     }
-
     const classroomMongooseID = new Types.ObjectId(classroomID);
-
-    // 2. Kiểm tra Classroom có tồn tại không
     const classroomExists = await this.classModel.exists({
       _id: classroomMongooseID,
     });
@@ -222,59 +274,41 @@ export class PostService {
       throw new NotFoundException('Không tìm thấy lớp học này.');
     }
 
-    // 3. Thực hiện Aggregation Pipeline
     try {
       const posts = (await this.classModel
         .aggregate([
-          // GĐ 1: Lọc Classroom theo ID
           { $match: { _id: classroomMongooseID } },
-
-          // GĐ 2: Lấy tất cả Slot IDs (Chỉ cần mảng slots)
           { $project: { slots: 1, _id: 0 } },
-
-          // GĐ 3: Tách mảng slots thành các documents riêng lẻ (từng Slot ID một)
           { $unwind: '$slots' },
-
-          // GĐ 4: Lookup (populate) các Slot Document
           {
             $lookup: {
-              from: 'slots', // Tên Collection Slot (chuẩn Mongoose: tên Class ở dạng số nhiều, chữ thường)
+              from: 'slots',
               localField: 'slots',
               foreignField: '_id',
               as: 'slotDetails',
             },
           },
-          { $unwind: '$slotDetails' }, // Tách mảng Slot (vì lookup trả về mảng)
-
-          // GĐ 5: Tách mảng Post IDs từ SlotDetails
+          { $unwind: '$slotDetails' },
           { $unwind: '$slotDetails.posts' },
-
-          // GĐ 6: Lookup (populate) các Post Document
           {
             $lookup: {
-              from: 'posts', // Tên Collection Post
+              from: 'posts',
               localField: 'slotDetails.posts',
               foreignField: '_id',
               as: 'postDetails',
             },
           },
-          { $unwind: '$postDetails' }, // Tách mảng Post (vì lookup trả về mảng)
-
-          // GĐ 7: Populate Author bên trong Post (vì Aggregation không hỗ trợ Populate lồng)
+          { $unwind: '$postDetails' },
           {
             $lookup: {
-              from: 'users', // Giả định tên Collection là 'users'
+              from: 'users',
               localField: 'postDetails.author',
               foreignField: '_id',
               as: 'postDetails.author',
             },
           },
-          { $unwind: '$postDetails.author' }, // Tách Author (nếu không phải là mảng)
-
-          // GĐ 8: Sắp xếp và Định hình lại Output
-          { $sort: { 'postDetails.createdAt': -1 } }, // Sắp xếp: Post mới nhất lên đầu
-
-          // Chỉ lấy những trường của Post Document làm output
+          { $unwind: '$postDetails.author' },
+          { $sort: { 'postDetails.createdAt': -1 } },
           { $replaceRoot: { newRoot: '$postDetails' } },
         ])
         .exec()) as unknown as PostDocument[];
@@ -295,7 +329,6 @@ export class PostService {
   }
 
   async getPostsBySlot(classroomID: string, slotID: string) {
-    // 1. Kiểm tra ID
     if (
       !Types.ObjectId.isValid(classroomID) ||
       !Types.ObjectId.isValid(slotID)

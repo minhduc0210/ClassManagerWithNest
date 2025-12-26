@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -12,6 +13,7 @@ import {
   Classroom,
   ClassroomDocument,
 } from '../classroom/entities/classroom.entity';
+import { PostService } from '../post/post.service';
 
 @Injectable()
 export class SlotService {
@@ -19,6 +21,7 @@ export class SlotService {
     @InjectModel(Slot.name) private readonly slotModel: Model<SlotDocument>,
     @InjectModel(Classroom.name)
     private readonly classroomModel: Model<ClassroomDocument>,
+    private readonly postService: PostService,
   ) {}
 
   async create(
@@ -127,7 +130,39 @@ export class SlotService {
     return await existingSlot.save();
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} slot`;
+  async remove(id: string): Promise<{ success: boolean }> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('ID Slot không hợp lệ.');
+    }
+
+    const slotMongooseID = new Types.ObjectId(id);
+    const slot = await this.slotModel.findById(slotMongooseID).exec();
+    if (!slot) {
+      throw new NotFoundException(`Slot với ID "${id}" không tồn tại.`);
+    }
+
+    try {
+      if (slot.posts && slot.posts.length > 0) {
+        await this.postService.deleteManyPosts(
+          slot.posts as unknown as Types.ObjectId[],
+        );
+      }
+      const updateResult = await this.classroomModel.updateOne(
+        { slots: slotMongooseID },
+        { $pull: { slots: slotMongooseID } },
+      );
+
+      if (updateResult.matchedCount === 0) {
+        console.warn(`Slot ${id} was not associated with any Classroom.`);
+      }
+      await this.slotModel.findByIdAndDelete(slotMongooseID);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error during slot removal process:', error);
+      throw new InternalServerErrorException(
+        'Đã xảy ra lỗi trong quá trình xóa Slot.',
+      );
+    }
   }
 }

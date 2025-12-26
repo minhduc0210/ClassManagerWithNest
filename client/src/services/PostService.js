@@ -20,14 +20,11 @@ export const fetchPostsBySlot = async (classroomID, slotID) => {
   return result;
 };
 
-export const fetchDownloadPostFile = async (fileUrl) => {
-  // Loại bỏ dấu "/" ở đầu nếu có để tránh URL bị sai cấu trúc
-  const cleanPath = fileUrl.startsWith("/") ? fileUrl.substring(1) : fileUrl;
-  const encodedPath = encodeURIComponent(cleanPath);
-  const response = await api.get(`${BASE_URL}/posts/download/${encodedPath}`, {
-    responseType: "blob",
-  });
-  return response.data;
+export const downloadCloudinaryFile = async (url) => {
+    const response = await api.get(url, {
+        responseType: 'blob',
+    });
+    return response.data;
 };
 
 export const fetchDeletePost = async (slotID, postID) => {

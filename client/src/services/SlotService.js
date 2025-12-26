@@ -7,7 +7,11 @@ export const fetchCreateSlot = async (classroomID, inputs) => {
 };
 
 export const fetchUpdateSlot = async (slotID, inputs) => {
-    const result = await api.patch(`${BASE_URL}/slots/${slotID}`, inputs);
-    return result;
-  };
+  const result = await api.patch(`${BASE_URL}/slots/${slotID}`, inputs);
+  return result;
+};
+
+export const fetchDeleteSlot = async (slotID) => {
+  return await api.delete(`${BASE_URL}/slots/${slotID}`);
+};
 
